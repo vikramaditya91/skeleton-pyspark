@@ -1,5 +1,35 @@
 """This module is responsible for transform (T) in ETL."""
 from pyspark.sql import DataFrame, functions as func
+from pyspark.sql.functions import lit, when, col
+
+
+def column_replace_name(df, orig: str, final: str):
+    return df.toDF(*(column.replace(orig, final) for column in df.columns))
+
+
+def transform_match_df(match_df_raw: DataFrame) -> DataFrame:
+    # TODO Determine which columns to keep and drop. Currently keeping all
+    reduced_match_df = match_df_raw.select("*")
+
+    reduced_match_df = reduced_match_df.withColumn(
+    "result",
+    when(reduced_match_df.home_team_goal > reduced_match_df.away_team_goal, lit("WIN")).\
+    when(reduced_match_df.home_team_goal == reduced_match_df.away_team_goal, lit("TIE")).\
+        otherwise(lit("LOSE")))
+
+    home_df = column_replace_name(reduced_match_df, "home", "this")
+    home_df = column_replace_name(home_df, "away", "other")
+    home_df = home_df.withColumn("is_playing_home_game", lit(True))
+
+    away_df = column_replace_name(reduced_match_df, "home", "other")
+    away_df = column_replace_name(away_df, "away", "this")
+    away_df = away_df.withColumn("is_playing_home_game", lit(False))
+
+    return home_df.union(away_df)
+
+
+def get_win_ratio_for_team(transformed_match_df):
+    return transformed_match_df.groupBy("this_team_api_id").pivot("RESULT").count().show()
 
 
 def explode_df(df: DataFrame, input_col: str, output_col: str) -> DataFrame:
