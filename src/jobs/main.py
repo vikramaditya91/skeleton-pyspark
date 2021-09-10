@@ -2,12 +2,14 @@
 building and ETL."""
 
 import contextlib
-from pyspark.sql import SparkSession
 from pathlib import Path
 from typing import Generator
 
+from pyspark.sql import SparkSession
+
 from src.jobs.extract import extract_file
-from src.jobs.transform import transform_df, transform_match_df, get_win_ratio_for_team
+from src.jobs.transform import transform_match_df, get_win_ratio_for_team, get_player_stats, get_max_player_stats
+from src.jobs.load import write_to_path
 from src.jobs.utils.general import EnvEnum
 from src.jobs.utils.log_utils import Logger
 
@@ -31,9 +33,13 @@ def jobs_main(spark: SparkSession, logger: Logger, input_dir: str) -> None:
     transformed_match_df = transform_match_df(match_df)
 
     count_df = get_win_ratio_for_team(transformed_match_df)
-    logger.info("Counted words in the DataFrame")
+    logger.info(f"The win/tie/lose ratio is as follows: {count_df.show(5)}")
 
-    load.write_to_path(count_df)
+    match_player_averaged_potential_df = get_player_stats(match_df, player_attribute_df)
+    max_player_stats = get_max_player_stats(match_player_averaged_potential_df, player_df)
+    logger.info(f"The following teams have had players with >87 potential in games: {max_player_stats.show(5)}")
+
+    write_to_path(max_player_stats)
     logger.info("Written counted words to path")
 
 
