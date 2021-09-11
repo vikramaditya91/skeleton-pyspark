@@ -9,7 +9,12 @@ from typing import Generator
 from pyspark.sql import SparkSession
 
 from src.jobs.extract import extract_file
-from src.jobs.transform import get_feature_set, get_normalized_matches, get_team_win_ratio, get_player_stats
+from src.jobs.transform import (
+    get_feature_set,
+    get_normalized_matches,
+    get_team_win_ratio,
+    get_player_stats,
+)
 from src.jobs.load import write_to_path
 from src.jobs.utils.general import EnvEnum
 from src.jobs.utils.log_utils import Logger
@@ -35,7 +40,9 @@ def jobs_main(spark: SparkSession, logger: Logger, input_dir: str) -> None:
     features_df = get_feature_set(match_df, player_df, player_attributes_df).cache()
     write_to_path(features_df)
     end_time = time()
-    logger.info(f"Wrote feature set with {features_df.count()} in {end_time - start_time}s")
+    logger.info(
+        f"Wrote feature set with {features_df.count()} in {end_time - start_time}s"
+    )
 
 
 @contextlib.contextmanager

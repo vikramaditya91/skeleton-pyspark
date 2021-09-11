@@ -21,14 +21,17 @@ def column_replace_name(orig: str, final: str, df: DataFrame):
     return df.toDF(*(column.replace(orig, final) for column in df.columns))
 
 
-def get_feature_set(match_df: DataFrame, player_df: DataFrame, player_attributes_df: DataFrame):
+def get_feature_set(
+    match_df: DataFrame, player_df: DataFrame, player_attributes_df: DataFrame
+):
     normalized_match_df = get_normalized_matches(match_df)
     match_player_df = get_match_players(match_df)
     player_stats_df = get_player_stats(match_player_df, player_attributes_df)
     team_win_ratio_df = get_team_win_ratio(normalized_match_df)
     return (
-        normalized_match_df
-        .join(player_stats_df, ["match_api_id", "is_playing_home_game"], "leftouter")
+        normalized_match_df.join(
+            player_stats_df, ["match_api_id", "is_playing_home_game"], "leftouter"
+        )
         .join(team_win_ratio_df, "this_team_api_id", "leftouter")
         .drop("match_api_id", "this_team_api_id", "other_team_api_id")
         .withColumnRenamed("result", "target")
@@ -53,25 +56,29 @@ def get_normalized_matches(match_df_raw: DataFrame) -> DataFrame:
     )
 
     home_df = (
-        cleaned_match_df
-            .transform(partial(column_replace_name, "home", "this"))
-            .transform(partial(column_replace_name, "away", "other"))
-            .withColumn("is_playing_home_game", func.lit(True))
-            .withColumn("result", result_col)
+        cleaned_match_df.transform(partial(column_replace_name, "home", "this"))
+        .transform(partial(column_replace_name, "away", "other"))
+        .withColumn("is_playing_home_game", func.lit(True))
+        .withColumn("result", result_col)
     )
     away_df = (
-        cleaned_match_df
-            .transform(partial(column_replace_name, "away", "this"))
-            .transform(partial(column_replace_name, "home", "other"))
-            .withColumn("is_playing_home_game", func.lit(False))
-            .withColumn("result", result_col)
+        cleaned_match_df.transform(partial(column_replace_name, "away", "this"))
+        .transform(partial(column_replace_name, "home", "other"))
+        .withColumn("is_playing_home_game", func.lit(False))
+        .withColumn("result", result_col)
     )
     return (
-        home_df
-            .union(away_df.select(*home_df.columns)) # select needed as union is location-based
-            .select("match_api_id", "this_team_api_id", "other_team_api_id", "is_playing_home_game", "result")
-            .na
-            .drop(subset=["result"])
+        home_df.union(
+            away_df.select(*home_df.columns)
+        )  # select needed as union is location-based
+        .select(
+            "match_api_id",
+            "this_team_api_id",
+            "other_team_api_id",
+            "is_playing_home_game",
+            "result",
+        )
+        .na.drop(subset=["result"])
     )
 
 
