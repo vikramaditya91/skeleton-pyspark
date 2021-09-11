@@ -56,10 +56,10 @@ def get_team_win_ratio(transformed_match_df):
             .select("this_team_api_id", "win_ratio")
     )
 
-def get_match_player_df(match_df: DataFrame):
+def get_match_players(match_df: DataFrame):
     def match_player_df(df, type_of_team: str, is_home:bool):
         return df.select(
-            'match_api_id', func.col(f'{type_of_team}_team_api_id').alias('team_api_id'),
+            'match_api_id',
             func.explode(func.array(*tuple(f'{type_of_team}_player_{item}' for item in range(1, 12)))).alias(
                 "player_api_id")
         ).withColumn('is_home_player', func.lit(is_home))

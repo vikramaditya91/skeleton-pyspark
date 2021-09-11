@@ -2,7 +2,25 @@
 from datetime import date
 from pyspark.sql import SparkSession, Row
 
-from src.jobs.transform import get_player_stats, get_team_win_ratio
+from src.jobs.transform import get_player_stats, get_team_win_ratio, get_match_players
+
+
+def test_get_match_players(spark_session_test: SparkSession) -> None:
+    match_1_home_players = dict(zip([f"home_player_{i}" for i in range(1, 12)], range(1, 12)))
+    match_1_away_players = dict(zip([f"away_player_{i}" for i in range(1, 12)], range(12, 23)))
+    match_2_home_players = dict(zip([f"home_player_{i}" for i in range(1, 12)], range(10, 21)))
+    match_2_away_players = dict(zip([f"away_player_{i}" for i in range(1, 12)], range(20, 31)))
+    match_df = spark_session_test.createDataFrame([
+        Row(match_api_id=1, **match_1_home_players, **match_1_away_players),
+        Row(match_api_id=2, **match_2_home_players, **match_2_away_players),
+    ])
+    out_df = get_match_players(match_df)
+    assert sorted(out_df.collect()) == sorted(
+        [Row(match_api_id=1, player_api_id=player_id, is_playing_home_game=True) for player_id in match_1_home_players.values()]
+        + [Row(match_api_id=1, player_api_id=player_id, is_playing_home_game=False) for player_id in match_1_away_players.values()]
+        + [Row(match_api_id=2, player_api_id=player_id, is_playing_home_game=True) for player_id in match_2_home_players.values()]
+        + [Row(match_api_id=2, player_api_id=player_id, is_playing_home_game=False) for player_id in match_2_away_players.values()]
+    )
 
 
 def test_get_team_win_ratio(spark_session_test: SparkSession) -> None:
