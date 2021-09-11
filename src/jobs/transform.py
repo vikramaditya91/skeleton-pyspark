@@ -44,15 +44,17 @@ def transform_match_df(match_df_raw: DataFrame) -> DataFrame:
     return home_df.union(away_df)
 
 
-def get_win_ratio_for_team(transformed_match_df):
-    result_df = transformed_match_df.groupBy("this_team_api_id").pivot("RESULT").count()
-    results_pivoted = result_df.fillna(0)
-    result_cols = ["LOSE", "TIE", "WIN"]
-    results_with_sum = results_pivoted.withColumn('total_games',
-                                                  reduce(add, [func.col(x) for x in result_cols]))
-    return results_with_sum.select("this_team_api_id",
-                                   *(func.expr(f"{column}/total_games") for column in result_cols))
-
+def get_team_win_ratio(transformed_match_df):
+    return (
+        transformed_match_df
+            .groupBy("this_team_api_id")
+            .agg(
+                func.sum((func.col("result") == "WIN").cast(IntegerType())).alias("won_count"),
+                func.count("result").alias("games_count"),
+            )
+            .withColumn("win_ratio", func.col("won_count") / func.col("games_count"))
+            .select("this_team_api_id", "win_ratio")
+    )
 
 def get_match_player_df(match_df: DataFrame):
     def match_player_df(df, type_of_team: str, is_home:bool):
