@@ -185,40 +185,40 @@ def test_get_player_stats(spark_session_test: SparkSession) -> None:
     )
     player_attributes_df = spark_session_test.createDataFrame(
         [
-            Row(player_api_id=1, date=date(2021, 1, 1), potential=0.9),
-            Row(player_api_id=2, date=date(2021, 1, 1), potential=0.7),
-            Row(player_api_id=2, date=date(2021, 1, 2), potential=0.8),
-            Row(player_api_id=3, date=date(2021, 1, 1), potential=0.7),
-            Row(player_api_id=4, date=date(2021, 1, 1), potential=0.8),
-            Row(player_api_id=4, date=date(2021, 1, 2), potential=1.0),
+            Row(player_api_id=1, date=date(2021, 1, 1), potential=90),
+            Row(player_api_id=2, date=date(2021, 1, 1), potential=70),
+            Row(player_api_id=2, date=date(2021, 1, 2), potential=80),
+            Row(player_api_id=3, date=date(2021, 1, 1), potential=70),
+            Row(player_api_id=4, date=date(2021, 1, 1), potential=80),
+            Row(player_api_id=4, date=date(2021, 1, 2), potential=100),
         ]
     )
-    out_df = get_player_stats(match_player_df, player_attributes_df)
+    out_df = get_player_stats(match_player_df, player_attributes_df, high_potential_threshold=87)
     assert sorted(out_df.collect()) == sorted(
         [
             Row(
                 match_api_id="match1",
                 is_playing_home_game=True,
                 has_high_potential_player=True,
-                average_potential=(0.9 + 0.75) / 2,
+                average_potential=(90 + 75) / 2,
             ),
             Row(
                 match_api_id="match1",
                 is_playing_home_game=False,
                 has_high_potential_player=True,
-                average_potential=(0.7 + 0.9) / 2,
+                average_potential=(70 + 90) / 2,
             ),
             Row(
                 match_api_id="match2",
                 is_playing_home_game=True,
                 has_high_potential_player=True,
-                average_potential=0.9,
+                average_potential=90,
             ),
             Row(
                 match_api_id="match2",
                 is_playing_home_game=False,
                 has_high_potential_player=False,
-                average_potential=0.75,
+                average_potential=75,
             ),
         ]
     )

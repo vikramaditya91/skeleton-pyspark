@@ -115,7 +115,7 @@ def get_match_players(match_df: DataFrame):
 def get_player_stats(
     match_player_df: DataFrame,
     player_attributes_df: DataFrame,
-    high_potential_threshold: float = 0.8,
+    high_potential_threshold: float = 87,
 ) -> DataFrame:
     average_potential_df = player_attributes_df.groupBy("player_api_id").agg(
         func.mean("potential").alias("potential")
