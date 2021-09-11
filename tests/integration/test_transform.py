@@ -2,24 +2,33 @@
 from datetime import date
 from pyspark.sql import SparkSession, Row
 
-from src.jobs.transform import get_player_stats, get_team_win_ratio, get_match_players, get_normalized_matches
+from src.jobs.transform import get_player_stats, get_team_win_ratio, get_match_players, get_normalized_matches, get_feature_set
+from src.jobs.extract import extract_file
 
 
-def test_normalize_matches(spark_session_test: SparkSession) -> None:
+def test_get_feature_set(spark_session_test: SparkSession) -> None:
+    match_df = extract_file(spark_session_test, "./data", "match.csv")
+    player_attributes_df = extract_file(spark_session_test, "./data", "player_attributes.csv")
+    player_df = extract_file(spark_session_test, "./data", "player.csv")
+    features_df = get_feature_set(match_df, player_df, player_attributes_df)
+    assert features_df.count() == 2000
+    assert sorted(features_df.columns) == sorted(["this_team_api_id", "other_team_api_id", "win_ratio", "average_potential", "has_high_potential_player", "is_playing_home_game", "target"])
+
+
+def test_get_normalized_matches(spark_session_test: SparkSession) -> None:
     match_df = spark_session_test.createDataFrame([
-        Row(home_team_api_id=1, away_team_api_id=2, home_team_goal=3, away_team_goal=2),
-        Row(home_team_api_id=2, away_team_api_id=3, home_team_goal=2, away_team_goal=3),
-        Row(home_team_api_id=3, away_team_api_id=4, home_team_goal=2, away_team_goal=2),
+        Row(match_api_id="a", home_team_api_id=1, away_team_api_id=2, home_team_goal=3, away_team_goal=2),
+        Row(match_api_id="b", home_team_api_id=2, away_team_api_id=3, home_team_goal=2, away_team_goal=3),
+        Row(match_api_id="c", home_team_api_id=3, away_team_api_id=4, home_team_goal=2, away_team_goal=2),
     ])
     out_df = get_normalized_matches(match_df)
-    print(out_df.collect())
     assert sorted(out_df.collect()) == sorted([
-        Row(this_team_api_id=1, other_team_api_id=2, is_playing_home_game=True, result="WIN"),
-        Row(this_team_api_id=2, other_team_api_id=1, is_playing_home_game=False, result="LOSE"),
-        Row(this_team_api_id=2, other_team_api_id=3, is_playing_home_game=True, result="LOSE"),
-        Row(this_team_api_id=3, other_team_api_id=2, is_playing_home_game=False, result="WIN"),
-        Row(this_team_api_id=3, other_team_api_id=4, is_playing_home_game=True, result="TIE"),
-        Row(this_team_api_id=4, other_team_api_id=3, is_playing_home_game=False, result="TIE"),
+        Row(match_api_id="a", this_team_api_id=1, other_team_api_id=2, is_playing_home_game=True, result="WIN"),
+        Row(match_api_id="a", this_team_api_id=2, other_team_api_id=1, is_playing_home_game=False, result="LOSE"),
+        Row(match_api_id="b", this_team_api_id=2, other_team_api_id=3, is_playing_home_game=True, result="LOSE"),
+        Row(match_api_id="b", this_team_api_id=3, other_team_api_id=2, is_playing_home_game=False, result="WIN"),
+        Row(match_api_id="c", this_team_api_id=3, other_team_api_id=4, is_playing_home_game=True, result="TIE"),
+        Row(match_api_id="c", this_team_api_id=4, other_team_api_id=3, is_playing_home_game=False, result="TIE"),
     ])
 
 def test_get_match_players(spark_session_test: SparkSession) -> None:
