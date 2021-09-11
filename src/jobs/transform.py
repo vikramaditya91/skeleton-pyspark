@@ -67,19 +67,35 @@ def get_match_player_df(match_df: DataFrame):
     return home_match_player_df.union(away_match_player_df)
 
 
-def get_player_stats(match_df, player_attribute_df):
+def get_player_stats(
+        match_player_df: DataFrame,
+        player_attributes_df: DataFrame,
+        high_potential_threshold: float = 0.8
+    ) -> DataFrame:
+    average_potential_df = (
+        player_attributes_df
+            .groupBy("player_api_id")
+            .agg(
+                func.mean("potential").alias("potential")
+            )
+    )
+    return (
+        match_player_df
+            .join(average_potential_df, "player_api_id", "leftouter")
+            .groupBy("match_api_id", "is_playing_home_game")
+            .agg(
+                func.max("potential").alias("max_potential"),
+                func.avg("potential").alias("average_potential"),
+            )
+            .withColumn("has_high_potential_player", func.col("max_potential") > high_potential_threshold)
+            .select("match_api_id", "is_playing_home_game", "has_high_potential_player", "average_potential")
+    )
+
+
+
+def get_average_player_potential(match_df, player_attribute_df):
     match_player_df = get_match_player_df(match_df)
     averaged_player_attributes = player_attribute_df.select(
         "player_api_id", func.col("potential").cast(FloatType())
     ).groupBy("player_api_id").agg(func.mean("potential").alias("player_average_potential"))
     return match_player_df.join(averaged_player_attributes, "player_api_id", "leftouter")
-
-
-def get_max_player_stats(match_player_averaged_potential_df, player_df):
-    window = Window.partitionBy("match_api_id", "team_api_id").orderBy("player_average_potential")
-    max_stats = match_player_averaged_potential_df.withColumn(
-        "ranked",
-        func.rank().over(window)
-    ).where("ranked == 11").drop("ranked")
-    max_df = max_stats.filter(func.col("player_average_potential") > 87)
-    return max_df.join(player_df, "player_api_id", "leftouter")

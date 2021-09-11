@@ -1,48 +1,31 @@
 """Integration-test transform jobs."""
+from datetime import date
 from pyspark.sql import SparkSession, Row
 
-from src.jobs.transform import explode_df, clean_df, transform_df
+from src.jobs.transform import get_player_stats
 
 
-def test_explode_df(spark_session_test: SparkSession) -> None:
-    """Confirm that explosion of DF works well."""
-    pre_explode_data = [("a b,c d",), ("",), ("12",), ("123*4",)]
-    df = spark_session_test.createDataFrame(pre_explode_data).toDF("in")
-    out_df = explode_df(df, input_col="in", output_col="out")
-    assert [item["out"] for item in out_df.collect()] == [
-        "a",
-        "b,c",
-        "d",
-        "",
-        "12",
-        "123*4",
-    ]
-
-
-def test_clean_df(spark_session_test: SparkSession) -> None:
-    """Confirm that clean of DF works well."""
-    pre_clean_data = ["aAb*,c4e, d4", "", "\\", "12", "43", "123*4"]
-    list_tuple = [(item,) for item in pre_clean_data]
-    df = spark_session_test.createDataFrame(list_tuple).toDF("in")
-    out_df = clean_df(df, input_col="in", output_col="out")
-    assert [item["out"] for item in out_df.collect()] == [
-        "aAbc4ed4",
-        "12",
-        "43",
-        "1234",
-    ]
-
-
-def test_end_to_end_transform(spark_session_test: SparkSession) -> None:
-    """Confirm that the complete transformation of DF works well."""
-    pre_clean_data = ["aAb*,c4e, d4", "d4,", "D4", "\\", "12", "43", "123*4"]
-    list_tuple = [(item,) for item in pre_clean_data]
-    df = spark_session_test.createDataFrame(list_tuple).toDF("value")
-    out_df = transform_df(df)
-    assert out_df.collect() == [
-        Row(lower_cased="aabc4e", count=1),
-        Row(lower_cased="43", count=1),
-        Row(lower_cased="1234", count=1),
-        Row(lower_cased="d4", count=3),
-        Row(lower_cased="12", count=1),
-    ]
+def test_get_player_stats(spark_session_test: SparkSession) -> None:
+    match_player_df = spark_session_test.createDataFrame([
+        Row(match_api_id="match1", player_api_id="player1", is_playing_home_game=True),
+        Row(match_api_id="match1", player_api_id="player2", is_playing_home_game=True),
+        Row(match_api_id="match1", player_api_id="player3", is_playing_home_game=False),
+        Row(match_api_id="match1", player_api_id="player4", is_playing_home_game=False),
+        Row(match_api_id="match2", player_api_id="player1", is_playing_home_game=True),
+        Row(match_api_id="match2", player_api_id="player2", is_playing_home_game=False),
+    ])
+    player_attributes_df = spark_session_test.createDataFrame([
+        Row(player_api_id="player1", date=date(2021, 1, 1), potential=0.9),
+        Row(player_api_id="player2", date=date(2021, 1, 1), potential=0.7),
+        Row(player_api_id="player2", date=date(2021, 1, 2), potential=0.8),
+        Row(player_api_id="player3", date=date(2021, 1, 1), potential=0.7),
+        Row(player_api_id="player4", date=date(2021, 1, 1), potential=0.8),
+        Row(player_api_id="player4", date=date(2021, 1, 2), potential=1.0),
+    ])
+    out_df = get_player_stats(match_player_df, player_attributes_df)
+    assert sorted(out_df.collect()) == sorted([
+        Row(match_api_id="match1", is_playing_home_game=True, has_high_potential_player=True, average_potential=(0.9 + 0.75)/2),
+        Row(match_api_id="match1", is_playing_home_game=False, has_high_potential_player=True, average_potential=(0.7+0.9)/2),
+        Row(match_api_id="match2", is_playing_home_game=True, has_high_potential_player=True, average_potential=0.9),
+        Row(match_api_id="match2", is_playing_home_game=False, has_high_potential_player=False, average_potential=0.75),
+    ])
