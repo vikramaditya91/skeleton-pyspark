@@ -1,5 +1,5 @@
 """This module is responsible for transform (T) in ETL."""
-from functools import reduce
+from functools import partial, reduce
 from operator import add
 
 from pyspark.sql import DataFrame, functions as func, Window
@@ -17,41 +17,51 @@ def clean_df_nulls(df):
     )
 
 
-def column_replace_name(df, orig: str, final: str):
+def column_replace_name(orig: str, final: str, df: DataFrame):
     return df.toDF(*(column.replace(orig, final) for column in df.columns))
 
 
-def transform_match_df(match_df_raw: DataFrame) -> DataFrame:
+def get_normalized_matches(match_df_raw: DataFrame) -> DataFrame:
     cleaned_match_df = clean_df_nulls(match_df_raw)
+    reduced_match_df = cleaned_match_df.select(
+        "home_team_api_id", "away_team_api_id", "home_team_goal", "away_team_goal"
+    )
 
-    # TODO Determine which columns to keep and drop. Currently keeping all
-    reduced_match_df = cleaned_match_df.select("*")
-
-    reduced_match_df = reduced_match_df.withColumn(
-        "result",
+    result_col = (
         func.when(
-            reduced_match_df.home_team_goal.cast(IntegerType())
-            > reduced_match_df.away_team_goal.cast(IntegerType()),
+            func.col("this_team_goal").cast(IntegerType())
+            > func.col("other_team_goal").cast(IntegerType()),
             func.lit("WIN"),
         )
         .when(
-            reduced_match_df.home_team_goal.cast(IntegerType())
-            == reduced_match_df.away_team_goal.cast(IntegerType()),
+            func.col("this_team_goal").cast(IntegerType())
+            == func.col("other_team_goal").cast(IntegerType()),
             func.lit("TIE"),
         )
-        .otherwise(func.lit("LOSE")),
+        .otherwise(func.lit("LOSE"))
     )
-    reduced_match_df = reduced_match_df.na.drop(subset=["result"])
 
-    home_df = column_replace_name(reduced_match_df, "home", "this")
-    home_df = column_replace_name(home_df, "away", "other")
-    home_df = home_df.withColumn("is_playing_home_game", func.lit(True))
-
-    away_df = column_replace_name(reduced_match_df, "home", "other")
-    away_df = column_replace_name(away_df, "away", "this")
-    away_df = away_df.withColumn("is_playing_home_game", func.lit(False))
-
-    return home_df.union(away_df)
+    home_df = (
+        reduced_match_df
+            .transform(partial(column_replace_name, "home", "this"))
+            .transform(partial(column_replace_name, "away", "other"))
+            .withColumn("is_playing_home_game", func.lit(True))
+            .withColumn("result", result_col)
+    )
+    away_df = (
+        reduced_match_df
+            .transform(partial(column_replace_name, "away", "this"))
+            .transform(partial(column_replace_name, "home", "other"))
+            .withColumn("is_playing_home_game", func.lit(False))
+            .withColumn("result", result_col)
+    )
+    return (
+        home_df
+            .union(away_df.select(*home_df.columns)) # select needed as union is location-based
+            .select("this_team_api_id", "other_team_api_id", "is_playing_home_game", "result")
+            .na
+            .drop(subset=["result"])
+    )
 
 
 def get_team_win_ratio(transformed_match_df):
