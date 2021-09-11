@@ -15,4 +15,8 @@ def extract_file(spark: SparkSession, input_dir: str, basename: str) -> DataFram
         DataFrame of single-column text file
 
     """
-    return spark.read.option('header', 'true').option('delimiter',',').csv(f"{input_dir}/{basename}")
+    return (
+        spark.read.option("header", "true")
+        .option("delimiter", ",")
+        .csv(f"{input_dir}/{basename}")
+    )
