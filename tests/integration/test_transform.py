@@ -12,7 +12,7 @@ def test_get_feature_set(spark_session_test: SparkSession) -> None:
     player_df = extract_file(spark_session_test, "./data", "player.csv")
     features_df = get_feature_set(match_df, player_df, player_attributes_df)
     assert features_df.count() == 2000
-    assert sorted(features_df.columns) == sorted(["this_team_api_id", "other_team_api_id", "win_ratio", "average_potential", "has_high_potential_player", "is_playing_home_game", "target"])
+    assert sorted(features_df.columns) == sorted(["win_ratio", "average_potential", "has_high_potential_player", "is_playing_home_game", "target"])
 
 
 def test_get_normalized_matches(spark_session_test: SparkSession) -> None:

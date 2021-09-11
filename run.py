@@ -10,7 +10,7 @@ from src.jobs.utils import log_utils
 def main(
     env: EnvEnum = typer.Argument(..., help="Environment for the spark-job"),
     input_dir: str = typer.Argument(
-        f"file://{Path(__file__).parent}/LICENSE", help="File which will be parsed"
+        f"file://{Path(__file__).parent}/data", help="File which will be parsed"
     ),
 ) -> None:
     """Execute main function for the package."""

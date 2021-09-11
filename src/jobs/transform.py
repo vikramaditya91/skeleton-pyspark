@@ -30,7 +30,7 @@ def get_feature_set(match_df: DataFrame, player_df: DataFrame, player_attributes
         normalized_match_df
         .join(player_stats_df, ["match_api_id", "is_playing_home_game"], "leftouter")
         .join(team_win_ratio_df, "this_team_api_id", "leftouter")
-        .drop("match_api_id")
+        .drop("match_api_id", "this_team_api_id", "other_team_api_id")
         .withColumnRenamed("result", "target")
     )
 

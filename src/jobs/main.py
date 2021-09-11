@@ -3,12 +3,13 @@ building and ETL."""
 
 import contextlib
 from pathlib import Path
+from time import time
 from typing import Generator
 
 from pyspark.sql import SparkSession
 
 from src.jobs.extract import extract_file
-from src.jobs.transform import transform_match_df, get_win_ratio_for_team, get_player_stats, get_max_player_stats
+from src.jobs.transform import get_feature_set, get_normalized_matches, get_team_win_ratio, get_player_stats
 from src.jobs.load import write_to_path
 from src.jobs.utils.general import EnvEnum
 from src.jobs.utils.log_utils import Logger
@@ -25,22 +26,16 @@ def jobs_main(spark: SparkSession, logger: Logger, input_dir: str) -> None:
 
     """
     file_names = ["match.csv", "player.csv", "player_attributes.csv"]
-    match_df, player_df, player_attribute_df = [extract_file(spark, input_dir, item) for item in file_names]
+    match_df, player_df, player_attributes_df = [
+        extract_file(spark, input_dir, item) for item in file_names
+    ]
 
-    logger.info(f"{file_names} extracted to DataFrame")
-
-    logger.info(f"match_df has {match_df.count()} rows.")
-    transformed_match_df = transform_match_df(match_df)
-
-    count_df = get_win_ratio_for_team(transformed_match_df)
-    logger.info(f"The win/tie/lose ratio is as follows: {count_df.show(5)}")
-
-    match_player_averaged_potential_df = get_player_stats(match_df, player_attribute_df)
-    max_player_stats = get_max_player_stats(match_player_averaged_potential_df, player_df)
-    logger.info(f"The following teams have had players with >87 potential in games: {max_player_stats.show(5)}")
-
-    write_to_path(max_player_stats)
-    logger.info("Written counted words to path")
+    logger.info(f"Processing {match_df.count()} matches.")
+    start_time = time()
+    features_df = get_feature_set(match_df, player_df, player_attributes_df).cache()
+    write_to_path(features_df)
+    end_time = time()
+    logger.info(f"Wrote feature set with {features_df.count()} in {end_time - start_time}s")
 
 
 @contextlib.contextmanager
