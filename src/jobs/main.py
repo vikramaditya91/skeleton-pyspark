@@ -2,33 +2,47 @@
 building and ETL."""
 
 import contextlib
-from pyspark.sql import SparkSession
 from pathlib import Path
+from time import time
 from typing import Generator
 
-from src.jobs import extract, transform, load
+from pyspark.sql import SparkSession
+
+from src.jobs.extract import extract_file
+from src.jobs.transform import (
+    get_feature_set,
+    get_normalized_matches,
+    get_team_win_ratio,
+    get_player_stats,
+)
+from src.jobs.load import write_to_path
 from src.jobs.utils.general import EnvEnum
 from src.jobs.utils.log_utils import Logger
 
 
-def jobs_main(spark: SparkSession, logger: Logger, file_path: str) -> None:
+def jobs_main(spark: SparkSession, logger: Logger, input_dir: str) -> None:
     """
     High-level function to perform the ETL job.
 
     Args:
         spark (SparkSession) : spark session to perform ETL job
         logger (Logger) : logger class instance
-        file_path (str): path on which the job will be performed
+        input_dir (str): path on which the job will be performed
 
     """
-    df = extract.extract_file(spark, file_path)
-    logger.info(f"{file_path} extracted to DataFrame")
+    file_names = ["match.csv", "player.csv", "player_attributes.csv"]
+    match_df, player_df, player_attributes_df = [
+        extract_file(spark, input_dir, item) for item in file_names
+    ]
 
-    count_df = transform.transform_df(df)
-    logger.info("Counted words in the DataFrame")
-
-    load.write_to_path(count_df)
-    logger.info("Written counted words to path")
+    logger.info(f"Processing {match_df.count()} matches.")
+    start_time = time()
+    features_df = get_feature_set(match_df, player_df, player_attributes_df).cache()
+    write_to_path(features_df)
+    end_time = time()
+    logger.info(
+        f"Wrote feature set with {features_df.count()} in {end_time - start_time}s"
+    )
 
 
 @contextlib.contextmanager
